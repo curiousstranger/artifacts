@@ -2,7 +2,7 @@
 
 A collection of single-page interactive tools and calculators, hosted on GitHub Pages.
 
-**Live site:** https://mcable.github.io/artifacts/
+**Live site:** https://artifacts.curiousstranger.org/
 
 ## Tools
 
