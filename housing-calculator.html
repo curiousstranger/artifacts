@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Housing Affordability Calculator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    function Row({ label, value }) {
+      return (
+        <div className="flex justify-between text-sm">
+          <span className="text-slate-600">{label}</span>
+          <span className="text-slate-900 font-medium">{value}</span>
+        </div>
+      );
+    }
+
+    function HousingAffordabilityCalculator() {
+      const [mode, setMode] = useState("rent");
+      const [income, setIncome] = useState(85000);
+      const [monthlyDebts, setMonthlyDebts] = useState(400);
+      const [downPayment, setDownPayment] = useState(40000);
+      const [interestRate, setInterestRate] = useState(6.75);
+      const [loanTerm, setLoanTerm] = useState(30);
+      const [propertyTaxRate, setPropertyTaxRate] = useState(0.55);
+      const [insuranceRate, setInsuranceRate] = useState(0.5);
+      const [hoa, setHoa] = useState(0);
+      const [dtiRatio, setDtiRatio] = useState(36);
+      const [pmiRate, setPmiRate] = useState(0.75);
+
+      const monthlyIncome = income / 12;
+
+      const rentBudget = useMemo(() => ({
+        conservative: monthlyIncome * 0.25,
+        standard: monthlyIncome * 0.30,
+        stretch: monthlyIncome * 0.35,
+      }), [monthlyIncome]);
+
+      const buyResults = useMemo(() => {
+        const maxMonthlyHousing = monthlyIncome * (dtiRatio / 100) - monthlyDebts;
+        if (maxMonthlyHousing <= 0) {
+          return { maxMonthlyHousing: 0, maxHomePrice: 0, principalAndInterest: 0, taxes: 0, insurance: 0, pmi: 0, hoaMonthly: hoa, hasPmi: false, loanAmount: 0, ltv: 0 };
+        }
+
+        const r = interestRate / 100 / 12;
+        const n = loanTerm * 12;
+        const taxMPD = propertyTaxRate / 100 / 12;
+        const insMPD = insuranceRate / 100 / 12;
+        const pmiMPD = pmiRate / 100 / 12;
+        const piFactor = r > 0 ? (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1) : 1 / n;
+
+        const priceNoPmi = Math.max(0, (maxMonthlyHousing + downPayment * piFactor - hoa) / (piFactor + taxMPD + insMPD));
+        const priceWithPmi = Math.max(0, (maxMonthlyHousing + downPayment * (piFactor + pmiMPD) - hoa) / (piFactor + taxMPD + insMPD + pmiMPD));
+        const noPmiConsistent = downPayment >= 0.20 * priceNoPmi;
+        const maxHomePrice = noPmiConsistent ? priceNoPmi : priceWithPmi;
+        const hasPmi = !noPmiConsistent && maxHomePrice > 0;
+        const loanAmount = Math.max(0, maxHomePrice - downPayment);
+        const principalAndInterest = loanAmount * piFactor;
+        const taxes = (maxHomePrice * propertyTaxRate) / 100 / 12;
+        const insurance = (maxHomePrice * insuranceRate) / 100 / 12;
+        const pmi = hasPmi ? loanAmount * pmiMPD : 0;
+        const ltv = maxHomePrice > 0 ? (loanAmount / maxHomePrice) * 100 : 0;
+
+        return { maxMonthlyHousing, maxHomePrice, principalAndInterest, taxes, insurance, pmi, hasPmi, hoaMonthly: hoa, loanAmount, ltv };
+      }, [monthlyIncome, monthlyDebts, downPayment, interestRate, loanTerm, propertyTaxRate, insuranceRate, hoa, dtiRatio, pmiRate]);
+
+      const fmt = (n) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+
+      // 30% rule home price for buy mode
+      const buy30 = useMemo(() => {
+        const budget30 = monthlyIncome * 0.30;
+        const r = interestRate / 100 / 12;
+        const n = loanTerm * 12;
+        const taxMPD = propertyTaxRate / 100 / 12;
+        const insMPD = insuranceRate / 100 / 12;
+        const pmiMPD = pmiRate / 100 / 12;
+        const piFactor = r > 0 ? (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1) : 1 / n;
+        const priceNoPmi30 = Math.max(0, (budget30 - hoa + downPayment * piFactor) / (piFactor + taxMPD + insMPD));
+        const priceWithPmi30 = Math.max(0, (budget30 - hoa + downPayment * (piFactor + pmiMPD)) / (piFactor + taxMPD + insMPD + pmiMPD));
+        const noPmiOk30 = downPayment >= 0.20 * priceNoPmi30;
+        return { price: noPmiOk30 ? priceNoPmi30 : priceWithPmi30, budget: budget30 };
+      }, [monthlyIncome, interestRate, loanTerm, propertyTaxRate, insuranceRate, pmiRate, hoa, downPayment]);
+
+      return (
+        <div className="min-h-screen bg-slate-50 p-4 md:p-8">
+          <div className="max-w-4xl mx-auto">
+            <header className="mb-6">
+              <h1 className="text-3xl font-bold text-slate-900">Housing Affordability Calculator</h1>
+              <p className="text-slate-600 mt-1">See what you can afford to rent or buy based on your income.</p>
+            </header>
+
+            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-1 inline-flex mb-6">
+              <button onClick={() => setMode("rent")} className={`px-6 py-2 rounded-md font-medium transition ${mode === "rent" ? "bg-blue-600 text-white" : "text-slate-600 hover:text-slate-900"}`}>Rent</button>
+              <button onClick={() => setMode("buy")} className={`px-6 py-2 rounded-md font-medium transition ${mode === "buy" ? "bg-blue-600 text-white" : "text-slate-600 hover:text-slate-900"}`}>Buy</button>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Inputs */}
+              <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+                <h2 className="text-lg font-semibold text-slate-900 mb-4">Your Finances</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Annual gross income</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+                      <input type="number" value={income} onChange={(e) => setIncome(Number(e.target.value))} className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">Monthly: {fmt(monthlyIncome)}</p>
+                  </div>
+
+                  {mode === "buy" && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Other monthly debt payments</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+                          <input type="number" value={monthlyDebts} onChange={(e) => setMonthlyDebts(Number(e.target.value))} className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500" />
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">Car loans, student loans, credit cards, etc.</p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Down payment</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+                          <input type="number" value={downPayment} onChange={(e) => setDownPayment(Number(e.target.value))} className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500" />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Interest rate</label>
+                          <div className="relative">
+                            <input type="number" step="0.05" value={interestRate} onChange={(e) => setInterestRate(Number(e.target.value))} className="w-full pr-7 pl-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500" />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">%</span>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Loan term (years)</label>
+                          <select value={loanTerm} onChange={(e) => setLoanTerm(Number(e.target.value))} className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                            <option value={15}>15</option>
+                            <option value={20}>20</option>
+                            <option value={30}>30</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <details className="border border-slate-200 rounded-md">
+                        <summary className="px-3 py-2 cursor-pointer text-sm font-medium text-slate-700 hover:bg-slate-50">Advanced settings</summary>
+                        <div className="p-3 space-y-3 border-t border-slate-200">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-slate-700 mb-1">Property tax rate</label>
+                              <div className="relative">
+                                <input type="number" step="0.05" value={propertyTaxRate} onChange={(e) => setPropertyTaxRate(Number(e.target.value))} className="w-full pr-7 pl-2 py-1.5 text-sm border border-slate-300 rounded-md" />
+                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-sm">%</span>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-slate-700 mb-1">Insurance rate</label>
+                              <div className="relative">
+                                <input type="number" step="0.05" value={insuranceRate} onChange={(e) => setInsuranceRate(Number(e.target.value))} className="w-full pr-7 pl-2 py-1.5 text-sm border border-slate-300 rounded-md" />
+                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-sm">%</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-slate-700 mb-1">Monthly HOA / condo fees</label>
+                            <div className="relative">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 text-sm">$</span>
+                              <input type="number" value={hoa} onChange={(e) => setHoa(Number(e.target.value))} className="w-full pl-6 pr-2 py-1.5 text-sm border border-slate-300 rounded-md" />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-slate-700 mb-1">PMI rate (annual % of loan, applied if down payment &lt; 20%)</label>
+                            <div className="relative">
+                              <input type="number" step="0.05" value={pmiRate} onChange={(e) => setPmiRate(Number(e.target.value))} className="w-full pr-7 pl-2 py-1.5 text-sm border border-slate-300 rounded-md" />
+                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-sm">%</span>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-0.5">Typical range: 0.5–1.5%</p>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-slate-700 mb-1">Max DTI ratio: {dtiRatio}%</label>
+                            <input type="range" min="28" max="45" value={dtiRatio} onChange={(e) => setDtiRatio(Number(e.target.value))} className="w-full" />
+                            <p className="text-xs text-slate-500 mt-0.5">28% conservative · 36% standard · 43%+ aggressive</p>
+                          </div>
+                        </div>
+                      </details>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Results */}
+              <div className="space-y-4">
+                {mode === "rent" ? (
+                  <>
+                    <div className="bg-blue-600 text-white rounded-lg shadow-sm p-6">
+                      <p className="text-blue-100 text-sm font-medium">Standard rule (30% of income)</p>
+                      <p className="text-4xl font-bold mt-1">{fmt(rentBudget.standard)}<span className="text-lg font-normal text-blue-100">/mo</span></p>
+                      <p className="text-blue-100 text-sm mt-2">Annual: {fmt(rentBudget.standard * 12)}</p>
+                    </div>
+                    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+                      <h3 className="font-semibold text-slate-900 mb-3">Other benchmarks</h3>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+                          <div>
+                            <p className="font-medium text-slate-900">Conservative (25%)</p>
+                            <p className="text-xs text-slate-500">Leaves more room for savings</p>
+                          </div>
+                          <p className="text-xl font-semibold text-slate-900">{fmt(rentBudget.conservative)}</p>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="font-medium text-slate-900">Stretch (35%)</p>
+                            <p className="text-xs text-slate-500">Tight but doable in HCOL areas</p>
+                          </div>
+                          <p className="text-xl font-semibold text-slate-900">{fmt(rentBudget.stretch)}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900">
+                      <p className="font-medium">A note on the 30% rule</p>
+                      <p className="mt-1 text-amber-800">It's a heuristic, not a law. What matters is total housing cost (rent + utilities + renter's insurance) relative to take-home pay, with enough left over for savings, debt, and life.</p>
+                    </div>
+                  </>
+                ) : (
+                  (() => {
+                    const price30 = buy30.price;
+                    const budget30 = buy30.budget;
+                    const priceDTI = buyResults.maxHomePrice;
+                    const conservativePrice = Math.min(price30, priceDTI);
+                    const dtiIsBinding = priceDTI <= price30;
+
+                    return (
+                      <>
+                        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-5">
+                          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">Two ways to estimate affordability</h2>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className={`rounded-lg p-4 ${dtiIsBinding ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700"}`}>
+                              <p className={`text-xs font-semibold uppercase tracking-wide mb-1 ${dtiIsBinding ? "text-blue-200" : "text-slate-500"}`}>
+                                DTI approach{dtiIsBinding ? " · binding" : ""}
+                              </p>
+                              <p className={`text-2xl font-bold leading-tight ${dtiIsBinding ? "text-white" : "text-slate-800"}`}>{fmt(priceDTI)}</p>
+                              <p className={`text-xs mt-1.5 ${dtiIsBinding ? "text-blue-100" : "text-slate-500"}`}>{dtiRatio}% DTI · {fmt(buyResults.maxMonthlyHousing)}/mo</p>
+                              <p className={`text-xs mt-1 ${dtiIsBinding ? "text-blue-100" : "text-slate-500"}`}>What lenders typically allow</p>
+                            </div>
+                            <div className={`rounded-lg p-4 ${!dtiIsBinding ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700"}`}>
+                              <p className={`text-xs font-semibold uppercase tracking-wide mb-1 ${!dtiIsBinding ? "text-blue-200" : "text-slate-500"}`}>
+                                30% rule{!dtiIsBinding ? " · binding" : ""}
+                              </p>
+                              <p className={`text-2xl font-bold leading-tight ${!dtiIsBinding ? "text-white" : "text-slate-800"}`}>{fmt(price30)}</p>
+                              <p className={`text-xs mt-1.5 ${!dtiIsBinding ? "text-blue-100" : "text-slate-500"}`}>30% of gross · {fmt(budget30)}/mo</p>
+                              <p className={`text-xs mt-1 ${!dtiIsBinding ? "text-blue-100" : "text-slate-500"}`}>A practical comfort ceiling</p>
+                            </div>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-3">
+                            {dtiIsBinding
+                              ? `Your other debts (${fmt(monthlyDebts)}/mo) make DTI the tighter constraint here. Both approaches are shown; the lower figure is the more realistic limit.`
+                              : `DTI allows more than the 30% rule here — lenders may approve a larger loan than you'll comfortably afford. The 30% figure is the more conservative guide.`}
+                          </p>
+                        </div>
+
+                        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+                          <h3 className="font-semibold text-slate-900 mb-1">Monthly payment breakdown</h3>
+                          <p className="text-xs text-slate-500 mb-3">Based on the lower (more conservative) estimate: {fmt(conservativePrice)}</p>
+                          <div className="space-y-2">
+                            <Row label="Principal & Interest" value={fmt(buyResults.principalAndInterest)} />
+                            <Row label="Property taxes" value={fmt(buyResults.taxes)} />
+                            <Row label="Homeowners insurance" value={fmt(buyResults.insurance)} />
+                            {buyResults.hasPmi && <Row label="PMI" value={fmt(buyResults.pmi)} />}
+                            {hoa > 0 && <Row label="HOA" value={fmt(hoa)} />}
+                            <div className="pt-2 mt-2 border-t border-slate-200 flex justify-between font-semibold">
+                              <span className="text-slate-900">Total monthly</span>
+                              <span className="text-slate-900">{fmt(Math.min(buyResults.maxMonthlyHousing, budget30))}</span>
+                            </div>
+                          </div>
+                          {buyResults.hasPmi && (
+                            <p className="mt-3 text-xs text-slate-500">
+                              PMI applies because your down payment is less than 20% of the home price. It drops automatically at 22% equity, or you can request removal at 20%.
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900">
+                          <p className="font-medium">Things this doesn't include</p>
+                          <p className="mt-1 text-amber-800">Closing costs, maintenance reserves (~1% of home value/year), and utilities. Build these into your decision separately.</p>
+                        </div>
+                      </>
+                    );
+                  })()
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<HousingAffordabilityCalculator />);
+  </script>
+</body>
+</html>
