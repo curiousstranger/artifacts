@@ -9,6 +9,8 @@ A collection of single-page interactive tools and calculators, hosted on GitHub 
 | Tool | Description |
 |------|-------------|
 | [Housing Affordability Calculator](housing-calculator.html) | Estimate what you can afford to rent or buy based on income, DTI, and the 30% rule |
+| [Age Distribution — Denver-Adjacent Municipalities](denver-metro-demographic-spread.html) | Compare demographic age spread across Denver metro municipalities |
+| [Pete's Macro Builder](illegal-petes-nutrition.html) | Build an Illegal Pete's order and get a full nutrition label, macro split and sodium check |
 
 ## Structure
 

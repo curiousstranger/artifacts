@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="Build an Illegal Pete's order and get a full nutrition label, macro split and sodium check.">
+<title>Pete's Macro Builder</title>
+<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Instrument+Sans:wght@400;500;600&family=Libre+Franklin:wght@400;700;900&display=swap">
+<style>
+:root{
+  --bg:#F6F3EE; --surface:#FFFFFF; --sunk:#EFEAE3; --ink:#2B1714; --muted:#7A6660; --line:#E3DAD2;
+  --accent:#C8321F; --accent-ink:#FFFFFF; --good:#3F7A3A; --warn:#B26B12; --bad:#B3261E;
+  --p:#3F7A3A; --c:#C98A1B; --f:#C8321F;
+  --display:"Bricolage Grotesque",ui-rounded,system-ui,sans-serif;
+  --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --label:"Libre Franklin","Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  color-scheme:dark;--bg:#17100E;--surface:#221917;--sunk:#1C1412;--ink:#F3EAE5;--muted:#A8958E;--line:#3A2C28;
+  --accent:#F0634C;--accent-ink:#1A0F0D;--good:#7DBF70;--warn:#E3A148;--bad:#F2786B;--p:#7DBF70;--c:#E3B04F;--f:#F0634C;}}
+:root[data-theme="dark"]{
+  color-scheme:dark;--bg:#17100E;--surface:#221917;--sunk:#1C1412;--ink:#F3EAE5;--muted:#A8958E;--line:#3A2C28;
+  --accent:#F0634C;--accent-ink:#1A0F0D;--good:#7DBF70;--warn:#E3A148;--bad:#F2786B;--p:#7DBF70;--c:#E3B04F;--f:#F0634C;}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;padding-inline:16px;padding-block:20px 120px}
+.wrap{max-width:1180px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:12px 24px;margin-bottom:20px}
+h1{font-family:var(--display);font-weight:800;font-size:clamp(28px,5vw,44px);line-height:1;margin:0;letter-spacing:-.01em;text-wrap:balance}
+h1 .star{color:var(--accent)}
+.sub{color:var(--muted);margin:6px 0 0;max-width:60ch}
+.toggle{display:inline-flex;background:var(--sunk);border:1px solid var(--line);border-radius:999px;padding:3px}
+.toggle button{border:0;background:transparent;color:var(--muted);font:600 13px var(--body);padding:6px 14px;border-radius:999px;cursor:pointer}
+.toggle button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:28px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:1fr}}
+/* builder */
+.formats{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:10px}
+@media (max-width:520px){.formats{grid-template-columns:repeat(3,1fr)}}
+.fmt{border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:10px 6px;font:600 14px var(--body);cursor:pointer;text-align:center}
+.fmt small{display:block;font-weight:400;color:var(--muted);font-size:11.5px;margin-top:2px}
+.fmt[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.fmtopts{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;background:var(--sunk);border-radius:10px;padding:10px 12px;margin-bottom:18px;font-size:14px}
+.fmtopts:empty{display:none}
+.fmtopts label{color:var(--muted);font-weight:500}
+select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:5px 8px}
+.note{color:var(--muted);font-size:12.5px;flex-basis:100%}
+section.cat{margin-bottom:18px}
+.cat h2{font:700 11.5px var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:0 0 6px;display:flex;justify-content:space-between}
+.catnote{color:var(--muted);font-size:12.5px;margin:0 0 6px;max-width:70ch}
+.cat h2 span{letter-spacing:0;text-transform:none;font-weight:500}
+.items{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px 14px;align-items:center;padding:8px 10px 8px 14px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row.on{background:color-mix(in srgb,var(--accent) 7%,var(--surface))}
+.nm{font-weight:500}
+.nm .alias{color:var(--muted);font-weight:400;font-size:12.5px}
+.meta{color:var(--muted);font-size:12.5px;font-variant-numeric:tabular-nums}
+.meta b{color:var(--ink);font-weight:600}
+.alg{display:inline-flex;gap:3px;margin-left:6px;vertical-align:1px}
+.alg i{font:600 9.5px var(--body);font-style:normal;border:1px solid var(--line);color:var(--muted);border-radius:4px;padding:0 4px;line-height:14px}
+.cal{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px;text-align:right;min-width:52px}
+.step{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.step button{width:32px;height:32px;border:0;background:transparent;color:var(--ink);font:600 17px var(--body);cursor:pointer}
+.step button:disabled{color:var(--line);cursor:default}
+.step output{min-width:40px;text-align:center;font:600 13px var(--body);font-variant-numeric:tabular-nums}
+.row:not(.on) .step output{color:var(--muted);font-weight:400}
+.add{height:32px;padding:0 14px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font:600 13px var(--body);cursor:pointer}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* summary column */
+aside{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px);display:grid;gap:14px;max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px - env(safe-area-inset-top,0px));overflow-y:auto;overscroll-behavior:contain;padding-right:4px;scrollbar-gutter:stable}
+@media (max-width:860px){aside{position:static;max-height:none;overflow:visible;padding-right:0}}
+.label{background:var(--surface);color:var(--ink);border:1px solid var(--ink);padding:8px 10px 10px;font-family:var(--label);font-variant-numeric:tabular-nums}
+.label .t{font-weight:900;font-size:30px;line-height:1;letter-spacing:-.01em;margin:0}
+.label .srv{font-size:13px;border-bottom:10px solid var(--ink);padding:4px 0 5px;color:var(--ink)}
+.label .srv b{display:block;font-size:14px}
+.label .calrow{display:flex;justify-content:space-between;align-items:end;border-bottom:5px solid var(--ink);padding:2px 0 3px}
+.label .calrow span{font-weight:900;font-size:24px}
+.label .calrow strong{font-weight:900;font-size:40px;line-height:1}
+.label .dvh{text-align:right;font-size:12px;font-weight:700;border-bottom:1px solid var(--ink);padding:3px 0}
+.label .ln{display:flex;justify-content:space-between;border-bottom:1px solid var(--ink);padding:2px 0;font-size:14px}
+.label .ln.in{padding-left:14px}
+.label .ln.in2{padding-left:28px}
+.label .ln b{font-weight:900}
+.label .ln.thick{border-bottom:10px solid var(--ink)}
+.label .ln .dv{font-weight:700}
+.label .ln.hi .dv{color:var(--bad)}
+.label .foot{font-size:11px;padding-top:5px;line-height:1.35}
+.label .contains{font-size:12.5px;padding-top:6px;border-top:1px solid var(--ink);margin-top:6px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.card h3{font:700 11.5px var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+.macro{display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--sunk)}
+.macro div{height:100%}
+.mleg{display:flex;justify-content:space-between;font-size:12.5px;margin-top:6px;font-variant-numeric:tabular-nums;color:var(--muted)}
+.mleg b{color:var(--ink)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;vertical-align:0}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.kpi{background:var(--sunk);border-radius:8px;padding:8px 10px}
+.kpi small{display:block;color:var(--muted);font-size:11.5px}
+.kpi b{font:800 20px var(--display);font-variant-numeric:tabular-nums}
+.kpi .pill{font:600 10.5px var(--body);border-radius:999px;padding:1px 7px;margin-left:4px;vertical-align:3px}
+.pill.ok{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
+.pill.warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.pill.bad{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad)}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 13px var(--body);border-radius:8px;padding:7px 12px;cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.presets{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;font-size:13px;overflow:hidden}
+.chip button{border:0;background:transparent;color:var(--ink);font:inherit;padding:4px 10px;cursor:pointer}
+.chip button+button{padding:4px 8px 4px 2px;color:var(--muted)}
+.save{display:flex;gap:6px;margin-top:8px}
+.save input{flex:1;min-width:0;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+.breakdown{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.breakdown td{padding:4px 0;border-top:1px solid var(--line)}
+.breakdown td:not(:first-child){text-align:right;padding-left:8px;color:var(--muted)}
+.breakdown tr:first-child td{border-top:0}
+.bar{height:3px;background:var(--accent);border-radius:2px;margin-top:3px;opacity:.7}
+#toast{min-height:1.2em;font-size:12.5px;color:var(--good);margin-top:6px}
+.dock{display:none}
+@media (max-width:860px){
+  .dock{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:5;background:var(--ink);color:var(--bg);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));justify-content:space-between;gap:10px;font-variant-numeric:tabular-nums;font-size:13px}
+  .dock b{font:800 18px var(--display);display:block}
+  .dock a{color:var(--bg);align-self:center;font-weight:600}
+}
+footer{color:var(--muted);font-size:12.5px;margin-top:28px;max-width:75ch}
+footer a{color:inherit}
+@media (prefers-reduced-motion:no-preference){.row{transition:background .15s}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Pete's Macro Builder<span class="star">&#9733;</span></h1>
+      <p class="sub">Build your Illegal Pete's order and get a full nutrition label. Numbers come from the chain's published nutrition sheet (Feb 10, 2026).</p>
+    </div>
+    <div class="toggle" role="group" aria-label="Portion size">
+      <button id="sizeFull" aria-pressed="true">Full size</button>
+      <button id="sizeKids" aria-pressed="false">Kids</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <main>
+      <div class="formats" id="formats" role="group" aria-label="Entrée"></div>
+      <div class="fmtopts" id="fmtopts"></div>
+      <div id="cats"></div>
+    </main>
+
+    <aside id="summary">
+      <div class="label" aria-live="polite">
+        <p class="t">Nutrition Facts</p>
+        <div class="srv"><b id="lblName">1 burrito</b><span id="lblWeight"></span></div>
+        <div class="dvh" style="border:0;text-align:left;font-size:12px;padding:3px 0 0">Amount per order</div>
+        <div class="calrow"><span>Calories</span><strong id="lCal">0</strong></div>
+        <div class="dvh">% Daily Value*</div>
+        <div id="lLines"></div>
+        <div class="foot">* The % Daily Value tells you how much a nutrient in a serving of food contributes to a daily diet. 2,000 calories a day is used for general nutrition advice.</div>
+        <div class="contains" id="lContains"></div>
+      </div>
+
+      <div class="card">
+        <h3>Where the calories come from</h3>
+        <div class="macro" id="macroBar"></div>
+        <div class="mleg" id="macroLeg"></div>
+        <div class="kpis" id="kpis"></div>
+      </div>
+
+      <div class="card">
+        <h3>Log it</h3>
+        <div class="btns">
+          <button class="btn primary" id="copyBtn">Copy summary</button>
+          <button class="btn" id="resetBtn">Clear order</button>
+        </div>
+        <div id="toast" role="status"></div>
+        <div class="save">
+          <label for="presetName" class="sr" hidden>Preset name</label>
+          <input id="presetName" placeholder="Name this order, e.g. Usual bowl" maxlength="40">
+          <button class="btn" id="saveBtn">Save</button>
+        </div>
+        <div class="presets" id="presets"></div>
+      </div>
+
+      <div class="card">
+        <h3>Biggest contributors</h3>
+        <table class="breakdown"><tbody id="breakdown"></tbody></table>
+      </div>
+    </aside>
+  </div>
+
+  <footer>
+    Transcribed from Illegal Pete's <a href="https://cdn.sanity.io/files/v6mnhs8n/production/b6a117975c3498bb7de586ab1f55e9dc1b0ca10d.pdf" target="_blank" rel="noopener">nutrition sheet dated 02.10.2026</a>. Values listed as "&lt;1 g" are counted as 0.5 g. Portions are Pete's standard scoops; what lands in your burrito varies by line cook, so treat totals as estimates. Nachos chip weight isn't published, so set it yourself. Salsas start at a 2 oz scoop because the sheet's 1 oz serving looks smaller than what the line serves. The sheet's salsa names differ from the menu's; likely matches are shown in grey. Allergen tags: G gluten, D dairy, E egg, S soy, F fish, P peanut. Not affiliated with Illegal Pete's.
+  </footer>
+</div>
+
+<div class="dock" id="dock"></div>
+
+<script>
+(function(){
+// [id, name, alias, portion, step, cal, fat, sat, trans, chol, sodium, carb, fiber, sugar, protein, allergens]
+const K=['cal','fat','sat','trans','chol','na','carb','fib','sug','pro'];
+function R(id,name,alias,portion,step,v,alg){const o={id,name,alias,portion,step,alg:alg||''};K.forEach((k,i)=>o[k]=v[i]);return o;}
+const D={
+ t13:R('t13','13" flour tortilla','','1 tortilla',1,[285,4,0,0,0,494,53,2,0,8],'G'),
+ t10:R('t10','10" flour tortilla','','1 tortilla',1,[220,3,0,0,0,380,41,2,0,6],'G'),
+ t6:R('t6','6" flour tortilla','','1 tortilla',1,[100,2,0,0,0,94,20,1,0,4],'G'),
+ corn:R('corn','White corn tortilla','','1 tortilla',1,[60,1,0,0,0,5,12,1,0,3]),
+ hard:R('hard','Hard shell','','1 shell',1,[65,3,1.25,0,0,0,8,1,0,1]),
+ lettuce:R('lettuce','Lettuce','','1 oz',1,[0,0,0,0,0,0,0,0,0,0]),
+ chipsOz:R('chipsOz','Tortilla chips','','per oz',1,[152.5,7.625,1.125,0,0,125,21.75,1,0,.875]),
+};
+const FULL={
+ rice:[R('rw','Cilantro lime white rice','','4 oz',1,[200,4.5,0,0,0,400,35,.5,0,3]),
+       R('rb','Spanish-style brown rice','','4 oz',1,[170,7,.5,.03,0,920,24,2,.5,3])],
+ beans:[R('bp','Pinto beans','','4 oz',1,[150,.5,0,0,0,330,28,10,.5,10]),
+        R('bk','Black beans','','4 oz',1,[140,5,0,0,0,510,26,9,.5,10])],
+ protein:[R('pc','Adobo marinated chicken','','4 oz',1,[200,10,2.5,0,140,370,1,0,1,27],'S'),
+          R('ps','Adobo marinated tri-tip steak','','4 oz',1,[210,13,3.5,0,70,310,1,0,1,22],'S'),
+          R('pb','Beef barbacoa','','4 oz',1,[240,12,5,0,65,700,3,.5,0,27]),
+          R('pk','Mexican Coke carnitas','','4 oz',1,[220,14,5,0,80,270,.5,0,1,23]),
+          R('pt','Taco Night (plant-based)','','4 oz',1,[190,12,1,0,0,420,4,2,1,17]),
+          R('pf','Coors-battered fish','','per piece',1,[130,10,.5,0,65,730,0,1,0,14],'FG')]
+};
+const KIDS={
+ rice:[R('krw','Kids white rice','','2 oz',1,[100,2.5,0,0,0,200,17,0,0,2]),
+       R('krb','Kids brown rice','','2 oz',1,[80,3.5,0,0,0,460,12,2,0,1])],
+ beans:[R('kbp','Kids pinto beans','','2 oz',1,[80,0,0,0,0,160,14,5,0,5]),
+        R('kbk','Kids black beans','','2 oz',1,[70,0,0,0,0,260,13,5,0,5])],
+ protein:[R('kpc','Kids chicken','','2 oz',1,[100,5,1.25,0,70,185,.5,0,.5,13.5],'S'),
+          R('kps','Kids tri-tip steak','','2 oz',1,[105,6.5,1.75,0,35,155,.5,0,.5,11],'S'),
+          R('kpb','Kids barbacoa','','2 oz',1,[120,6,2.5,0,32.5,350,1.5,0,0,13.5]),
+          R('kpk','Kids carnitas','','2 oz',1,[110,7,2.5,0,40,135,0,0,.5,11.5]),
+          R('kpt','Kids Taco Night','','2 oz',1,[95,6,.5,0,0,210,2,1,.5,8.5])]
+};
+const SHARED=[
+ ['hot','Hot toppings',[
+   R('hf','Fajita veggies','','2 oz',1,[30,2,0,0,0,120,3,.5,2,.5]),
+   R('hp','Primavera veggies','','2 oz',1,[30,2,0,0,0,120,3,.5,2,.5]),
+   R('ho','Potatoes','','4 oz',1,[200,12,.5,0,0,850,21,2,1,1])]],
+ ['cold','Cold toppings',[
+   R('cc','Shredded cheese','','1 oz',1,[110,9,5,0,25,190,1,1,0,6],'D'),
+   R('cs','Sour cream','','1 oz',1,[60,4.5,3.5,0,20,15,.5,0,.5,.5],'D'),
+   R('cl','Lettuce','','1 oz',1,[0,0,0,0,0,0,0,0,0,0]),
+   R('cb','Shredded cabbage','','1 oz',1,[5,0,0,0,0,5,2,.5,.5,0]),
+   R('co','Diced onion','','1 oz',1,[10,0,0,0,0,0,3,0,1,0]),
+   R('ci','Cilantro','','1 oz',1,[5,0,0,0,0,15,.5,.5,0,.5]),
+   R('cj','Jalapeños','','1 oz',1,[0,0,0,0,0,210,1,0,0,0]),
+   R('cv','Black olives','','1 oz',1,[45,4.5,0,0,0,220,2,0,0,0])]],
+ ['salsa','Salsas',[
+   R('sf','Salsa fresca','','1 oz',1,[5,0,0,0,0,150,1,0,.5,0]),
+   R('sc','Poblano corn salsa','menu: Chile Corn','1 oz',1,[20,0,0,0,0,180,5,.5,.5,.5]),
+   R('sv','Verde salsa','menu: Tomatillo Verde','1 oz',1,[5,0,0,0,0,35,1,0,0,0]),
+   R('sh','Hot salsa','likely Picante','1 oz',1,[5,0,0,0,0,135,1,0,.5,0]),
+   R('sx','XXX hot salsa','likely House Hot','1 oz',1,[15,0,0,0,0,250,3,.5,.5,0])]],
+ ['dress','Dressings & sauces',[
+   R('dv','Tomato vinaigrette','','1 oz',1,[80,8,.5,0,0,300,2,0,1,0]),
+   R('db','Baja sauce','','1 oz',1,[90,9,1.5,0,10,120,1,0,.5,.5],'D'),
+   R('dr','Chipotle ranch','','1 oz',1,[110,12,2,0,5,180,2,0,1,.5],'D')]],
+ ['extra','Extras & smothering',[
+   R('eg','Guacamole','','4 oz',1,[170,16,2.5,0,0,590,10,7,.5,2]),
+   R('eq','Queso','','3 oz',1,[160,12,7,0,40,640,6,.5,4,9],'D'),
+   R('ep','Pork green chile','','3 oz',1,[80,6,1.5,0,10,270,4,0,.5,4],'G'),
+   R('ev','Vegan green chile','','3 oz',1,[70,4,1,0,0,350,7,.5,.5,.5],'G'),
+   R('eo','Poblano pesto','','2 oz',1,[140,13,1.5,0,0,95,3,1,1,4])]],
+ ['bfast','Breakfast add-ins',[
+   R('be','Eggs','','4 oz',1,[160,10,3.5,0,385,250,0,0,0,14],'E'),
+   R('bc','Chorizo','','2 oz',1,[150,11,4,0,35,300,2,0,0,9]),
+   R('bn','Bacon','','1 oz',1,[120,12,4,0,20,260,0,0,0,3]),
+   R('bm','Veggie medley','','1 oz',1,[15,1,0,0,0,60,2,0,.5,0])]],
+ ['tort','Tortillas on the side',[
+   R('st13','13" flour tortilla','','1 tortilla',1,[285,4,0,0,0,494,53,2,0,8],'G'),
+   R('st6','6" flour tortilla','','1 tortilla',1,[100,2,0,0,0,94,20,1,0,4],'G'),
+   R('stc','White corn tortilla','','1 tortilla',1,[60,1,0,0,0,5,12,1,0,3]),
+   R('sth','Hard shell','','1 shell',1,[65,3,1.25,0,0,0,8,1,0,1])]],
+ ['sides','Sides, specialties & dessert',[
+   R('xsc','Small chips','','2 oz',1,[310,15,2,0,0,250,44,2,0,4]),
+   R('xlc','Large chips','','8 oz',1,[1220,61,9,0,0,1000,174,8,0,7]),
+   R('xcq','Large chips + queso','','1 order',1,[1650,92,29,0,100,2700,191,9,11,43],'D'),
+   R('xcg','Large chips + guac','','1 order',1,[1570,93,13,0,0,2190,194,23,2,22]),
+   R('xlq','Large queso','','8 oz',1,[430,31,20,0,100,1700,1,0,11,25],'D'),
+   R('xlg','Large guacamole','','8 oz',1,[350,32,4.5,0,0,1190,20,15,2,4]),
+   R('xfb','Baja fish burrito','','1 burrito',1,[1000,63,6,0,265,3970,63,10,5,69],'FG'),
+   R('xfw','Baja fish bowl','','1 bowl',1,[730,58,6,0,265,3450,15,11,8,62],'FG'),
+   R('xft','Baja fish tacos (3)','','3 tacos',1,[810,56,6,0,185,2740,50,10,8,46],'FG'),
+   R('xq','Basic quesadilla','','1 quesadilla',1,[510,22,10,0,50,880,55,4,0,20],'DG'),
+   R('xkq','Kids basic quesadilla','','1 quesadilla',1,[390,17,8,0,40,740,43,3,0,15],'DG'),
+   R('xcs','Chicken Silly Sticks','','2 taquitos',1,[320,14,1.5,0,90,860,27,3,.5,22],'G'),
+   R('xbs','Beef Silly Sticks','','2 taquitos',1,[370,19,4.5,0,50,530,26,3,.5,23],'G'),
+   R('xgp','Bowl of pork green chile','','16 oz',1,[440,31,9,0,55,1660,19,2,4,21],'G'),
+   R('xgv','Bowl of vegan green chile','','16 oz',1,[360,22,1.5,0,0,1880,38,3,5,3],'G'),
+   R('xck','Giant chocolate chip cookie','','1 cookie',1,[550,25,15,0,65,410,81,3,52,5],'GEDP')]]
+];
+const ALL={};Object.values(D).forEach(r=>ALL[r.id]=r);
+[FULL,KIDS].forEach(s=>Object.values(s).flat().forEach(r=>ALL[r.id]=r));
+SHARED.forEach(c=>c[2].forEach(r=>{ALL[r.id]=r;if(c[0]==='salsa')r.def=2;}));
+const ALG={G:'Gluten',D:'Dairy',E:'Egg',S:'Soy',F:'Fish',P:'Peanut'};
+const FORMATS=[['burrito','Burrito','13" tortilla'],['bowl','Bowl','no tortilla'],['tacos','Tacos','pick shells'],['salad','Salad','lettuce base'],['nachos','Nachos','chip base'],['none','Sides only','no entrée']];
+
+let S=defaultState();
+function defaultState(){return {size:'full',fmt:'burrito',shell:'corn',shellN:3,chipOz:4,q:{pc:1,rw:1,bk:1,hf:1,cc:1,sf:2}};}
+try{const s=JSON.parse(localStorage.getItem('pete.state')||'null');if(s&&s.q){S=Object.assign(defaultState(),s);for(const k in S.q)S.q[k]=Math.max(1,Math.round(S.q[k]));}}catch(e){}
+function persist(){try{localStorage.setItem('pete.state',JSON.stringify(S));}catch(e){}}
+
+const $=id=>document.getElementById(id);
+const fmtQ=(q,step)=>{if(step===1)return q+'×';const w=Math.floor(q),h=q-w>0;return (w?w:'')+(h?'½':'')+'×';};
+const nf=n=>Math.round(n).toLocaleString();
+const g=n=>{if(n>0&&n<1)return '<1';return String(Math.round(n));};
+
+function cats(){
+  const base=S.size==='kids'?KIDS:FULL;
+  return [['protein','Protein',base.protein],['rice','Rice',base.rice],['beans','Beans',base.beans]].concat(SHARED);
+}
+
+function renderFormats(){
+  $('formats').innerHTML=FORMATS.map(f=>{
+    let sub=f[2]; if(f[0]==='burrito'&&S.size==='kids')sub='10" tortilla';
+    return `<button class="fmt" data-f="${f[0]}" aria-pressed="${S.fmt===f[0]}">${f[1]}<small>${sub}</small></button>`;}).join('');
+  let o='';
+  if(S.fmt==='tacos'){
+    o=`<label for="shell">Shell</label><select id="shell">${[['corn','White corn tortilla'],['t6','6" flour tortilla'],['hard','Hard shell']].map(s=>`<option value="${s[0]}" ${S.shell===s[0]?'selected':''}>${s[1]}</option>`).join('')}</select>
+       <label for="shellN">Tacos</label><select id="shellN">${[1,2,3,4,5,6].map(n=>`<option ${S.shellN===n?'selected':''}>${n}</option>`).join('')}</select>
+       <span class="note">Fillings below are for the whole order, so a standard scoop of protein is split across all the tacos.</span>`;
+  } else if(S.fmt==='nachos'){
+    o=`<label for="chipOz">Chips</label><select id="chipOz">${[2,3,4,5,6,8].map(n=>`<option value="${n}" ${S.chipOz===n?'selected':''}>${n} oz</option>`).join('')}</select>
+       <span class="note">Pete's doesn't publish a nachos chip weight. Their small side of chips is 2 oz and the large is 8 oz; weigh or guess accordingly.</span>`;
+  } else if(S.fmt==='salad'){
+    o=`<span class="note">Lettuce is essentially zero calories. Dressing is where a salad adds up: 80–110 cal per ounce.</span>`;
+  }
+  $('fmtopts').innerHTML=o;
+}
+
+function renderCats(){
+  $('cats').innerHTML=cats().map(([key,title,rows])=>{
+    const n=rows.filter(r=>S.q[r.id]>0).length;
+    const cn=key==='salsa'?`<p class="catnote">Pete's lists salsas at 1 oz (2 tbsp), which is smaller than a typical scoop. Adding one starts at 2 oz; use − for a light scoop.</p>`:'';
+    return `<section class="cat"><h2>${title}<span>${n?n+' selected':''}</span></h2>${cn}<div class="items">${rows.map(rowHTML).join('')}</div></section>`;
+  }).join('');
+}
+function rowHTML(r){
+  const q=S.q[r.id]||0;
+  const alg=r.alg?`<span class="alg">${[...r.alg].map(a=>`<i title="${ALG[a]}">${a}</i>`).join('')}</span>`:'';
+  const alias=r.alias?` <span class="alias">(${r.alias})</span>`:'';
+  const ctl=q>0?`<div class="step"><button data-id="${r.id}" data-d="-1" aria-label="Less ${r.name}">−</button><output>${fmtQ(q,r.step)}</output><button data-id="${r.id}" data-d="1" aria-label="More ${r.name}" ${q>=6?'disabled':''}>+</button></div>`
+               :`<button class="add" data-id="${r.id}" data-d="1" aria-label="Add ${r.name}">Add</button>`;
+  return `<div class="row ${q>0?'on':''}"><div><div class="nm">${r.name}${alias}${alg}</div><div class="meta">${r.portion}${r.def?' (starts at '+r.def+'×)':''} · <b>${g(r.pro)}g</b> protein · ${nf(r.na)} mg sodium</div></div><div class="cal">${nf(r.cal*(q||r.def||1))}<br><span style="font-size:11px">cal</span></div>${ctl}</div>`;
+}
+
+function lines(){
+  const L=[];
+  if(S.fmt==='burrito')L.push([S.size==='kids'?D.t10:D.t13,1,S.size==='kids'?'10" tortilla':'13" tortilla']);
+  if(S.fmt==='tacos')L.push([D[S.shell],S.shellN,S.shellN+' × '+D[S.shell].name.toLowerCase()]);
+  if(S.fmt==='nachos')L.push([D.chipsOz,S.chipOz,S.chipOz+' oz chips']);
+  const live=new Set(cats().flatMap(c=>c[2].map(r=>r.id)));
+  Object.entries(S.q).forEach(([id,q])=>{if(q>0&&live.has(id)&&ALL[id])L.push([ALL[id],q,ALL[id].name+(q!==1?' ('+fmtQ(q,ALL[id].step)+')':'')]);});
+  return L;
+}
+function totals(L){const t={};K.forEach(k=>t[k]=0);const alg=new Set();
+  L.forEach(([r,q])=>{K.forEach(k=>t[k]+=r[k]*q);[...r.alg].forEach(a=>alg.add(a));});t.alg=alg;return t;}
+
+const DV={fat:78,sat:20,chol:300,na:2300,carb:275,fib:28};
+function renderSummary(){
+  const L=lines(),t=totals(L);
+  const fmt=FORMATS.find(f=>f[0]===S.fmt);
+  const name=S.fmt==='none'?'Sides & extras':(S.fmt==='tacos'?S.shellN+' tacos':'1 '+fmt[1].toLowerCase());
+  $('lblName').textContent=(S.size==='kids'&&S.fmt!=='none'?'Kids ':'')+name;
+  $('lblWeight').textContent=L.length?L.length+' components':'Nothing added yet';
+  $('lCal').textContent=nf(t.cal);
+  const dv=(k)=>DV[k]?Math.round(t[k]/DV[k]*100):null;
+  const ln=(label,val,unit,k,cls='',bold=true)=>{const d=k?dv(k):null;return `<div class="ln ${cls} ${d>=40&&k!=="fib"?"hi":""}"><span>${bold?'<b>'+label+'</b>':label} ${val}${unit}</span><span class="dv">${d!==null?d+'%':''}</span></div>`;};
+  $('lLines').innerHTML=
+    ln('Total Fat',g(t.fat),'g','fat')+
+    ln('Saturated Fat',g(t.sat),'g','sat','in',false)+
+    ln('<i>Trans</i> Fat',g(t.trans),'g',null,'in',false)+
+    ln('Cholesterol',nf(t.chol),'mg','chol')+
+    ln('Sodium',nf(t.na),'mg','na')+
+    ln('Total Carbohydrate',g(t.carb),'g','carb')+
+    ln('Dietary Fiber',g(t.fib),'g','fib','in',false)+
+    ln('Total Sugars',g(t.sug),'g',null,'in',false)+
+    ln('Protein',g(t.pro),'g',null,'thick');
+  $('lContains').innerHTML=t.alg.size?'<b>Contains:</b> '+[...t.alg].map(a=>ALG[a]).join(', ')+'.':'<b>Contains:</b> none of the tracked allergens.';
+
+  const pc=t.pro*4,cc=t.carb*4,fc=t.fat*9,sum=pc+cc+fc||1;
+  $('macroBar').innerHTML=`<div style="width:${pc/sum*100}%;background:var(--p)"></div><div style="width:${cc/sum*100}%;background:var(--c)"></div><div style="width:${fc/sum*100}%;background:var(--f)"></div>`;
+  $('macroLeg').innerHTML=`<span><i class="dot" style="background:var(--p)"></i>Protein <b>${Math.round(pc/sum*100)}%</b></span><span><i class="dot" style="background:var(--c)"></i>Carbs <b>${Math.round(cc/sum*100)}%</b></span><span><i class="dot" style="background:var(--f)"></i>Fat <b>${Math.round(fc/sum*100)}%</b></span>`;
+  const ppc=t.cal?t.pro/t.cal*100:0;
+  const naP=t.na/2300*100;
+  const pill=(cls,txt)=>`<span class="pill ${cls}">${txt}</span>`;
+  $('kpis').innerHTML=
+   `<div class="kpi"><small>Protein per 100 cal</small><b>${ppc.toFixed(1)}g</b>${t.cal?(ppc>=8?pill('ok','lean'):ppc>=5?pill('warn','ok'):pill('bad','low')):''}</div>`+
+   `<div class="kpi"><small>Sodium vs 2,300 mg/day</small><b>${Math.round(naP)}%</b>${t.cal?(naP<=35?pill('ok','fine'):naP<=65?pill('warn','high'):pill('bad','very high')):''}</div>`+
+   `<div class="kpi"><small>Net carbs</small><b>${g(Math.max(0,t.carb-t.fib))}g</b></div>`+
+   `<div class="kpi"><small>Fiber</small><b>${g(t.fib)}g</b></div>`;
+
+  const top=L.map(([r,q,lbl])=>({lbl,cal:r.cal*q,na:r.na*q})).sort((a,b)=>b.cal-a.cal).slice(0,8);
+  const max=top[0]?.cal||1;
+  $('breakdown').innerHTML=top.length?top.map(x=>`<tr><td>${x.lbl}<div class="bar" style="width:${x.cal/max*100}%"></div></td><td>${nf(x.cal)} cal</td><td>${nf(x.na)} mg</td></tr>`).join(''):'<tr><td>Add something to see the breakdown.</td></tr>';
+
+  $('dock').innerHTML=`<div><b>${nf(t.cal)}</b>cal</div><div><b>${g(t.pro)}g</b>protein</div><div><b>${nf(t.na)}</b>mg sodium</div><a href="#summary">Label ↓</a>`;
+  return {L,t,name};
+}
+
+function summaryText(){
+  const {L,t,name}=renderSummary();
+  const items=L.map(x=>x[2]).join(', ');
+  return `Illegal Pete's ${name.replace(/^1 /,'')}: ${items}\n${nf(t.cal)} cal · ${g(t.fat)}g fat (${g(t.sat)}g sat) · ${g(t.carb)}g carbs · ${g(t.fib)}g fiber · ${g(t.sug)}g sugar · ${g(t.pro)}g protein · ${nf(t.chol)}mg cholesterol · ${nf(t.na)}mg sodium`;
+}
+
+function renderPresets(){
+  let P={};try{P=JSON.parse(localStorage.getItem('pete.presets')||'{}');}catch(e){}
+  $('presets').innerHTML=Object.keys(P).map(n=>`<span class="chip"><button data-load="${encodeURIComponent(n)}">${n.replace(/</g,'&lt;')}</button><button data-del="${encodeURIComponent(n)}" aria-label="Delete ${n.replace(/"/g,'')}">×</button></span>`).join('');
+  return P;
+}
+function all(){renderFormats();renderCats();renderSummary();persist();}
+function toast(m){$('toast').textContent=m;clearTimeout(toast.t);toast.t=setTimeout(()=>$('toast').textContent='',2500);}
+
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.f){S.fmt=b.dataset.f;
+    if(S.fmt==='salad'&&!(S.q.cl>0))S.q.cl=2;
+    all();return;}
+  if(b.dataset.id){const r=ALL[b.dataset.id];const cur=S.q[r.id]||0;const q=(!cur&&+b.dataset.d>0&&r.def)?r.def:cur+(+b.dataset.d)*r.step;S.q[r.id]=Math.max(0,Math.min(6,q));
+    if(!S.q[r.id])delete S.q[r.id];renderCats();renderSummary();persist();return;}
+  if(b.dataset.load){const P=renderPresets();const p=P[decodeURIComponent(b.dataset.load)];if(p){S=Object.assign(defaultState(),JSON.parse(JSON.stringify(p)));all();toast('Loaded '+decodeURIComponent(b.dataset.load));}return;}
+  if(b.dataset.del){const P=renderPresets();delete P[decodeURIComponent(b.dataset.del)];try{localStorage.setItem('pete.presets',JSON.stringify(P));}catch(e){}renderPresets();return;}
+});
+document.addEventListener('change',e=>{
+  const t=e.target;
+  if(t.id==='shell')S.shell=t.value;
+  if(t.id==='shellN')S.shellN=+t.value;
+  if(t.id==='chipOz')S.chipOz=+t.value;
+  renderSummary();persist();
+});
+function setSize(sz){
+  if(S.size===sz)return;
+  // map selections between full and kids equivalents
+  const map={rw:'krw',rb:'krb',bp:'kbp',bk:'kbk',pc:'kpc',ps:'kps',pb:'kpb',pk:'kpk',pt:'kpt'};
+  const inv=Object.fromEntries(Object.entries(map).map(([a,b])=>[b,a]));
+  const m=sz==='kids'?map:inv;const nq={};
+  Object.entries(S.q).forEach(([id,q])=>{nq[m[id]||id]=q;});S.q=nq;S.size=sz;
+  $('sizeFull').setAttribute('aria-pressed',sz==='full');$('sizeKids').setAttribute('aria-pressed',sz==='kids');all();
+}
+$('sizeFull').onclick=()=>setSize('full');$('sizeKids').onclick=()=>setSize('kids');
+$('sizeFull').setAttribute('aria-pressed',S.size==='full');$('sizeKids').setAttribute('aria-pressed',S.size==='kids');
+$('resetBtn').onclick=()=>{S.q={};all();toast('Order cleared');};
+$('copyBtn').onclick=()=>{const txt=summaryText();
+  navigator.clipboard.writeText(txt).then(()=>toast('Copied to clipboard'),()=>{toast('Copy blocked here. Text is in the name box; select and copy it.');$('presetName').value=txt.split('\n')[1];$('presetName').select();});};
+$('saveBtn').onclick=()=>{const n=$('presetName').value.trim();if(!n){toast('Give the order a name first');return;}
+  const P=renderPresets();P[n]=JSON.parse(JSON.stringify(S));try{localStorage.setItem('pete.presets',JSON.stringify(P));toast('Saved '+n);}catch(e){toast('This browser blocked saving');}
+  $('presetName').value='';renderPresets();};
+all();renderPresets();
+})();
+</script>
+</body>
+</html>
