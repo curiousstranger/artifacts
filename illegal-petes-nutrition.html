@@ -298,6 +298,7 @@ const ALL={};Object.values(D).forEach(r=>ALL[r.id]=r);
 SHARED.forEach(c=>c[2].forEach(r=>{ALL[r.id]=r;if(c[0]==='salsa')r.def=2;}));
 const ALG={G:'Gluten',D:'Dairy',E:'Egg',S:'Soy',F:'Fish',P:'Peanut'};
 const FORMATS=[['burrito','Burrito','13" tortilla'],['bowl','Bowl','no tortilla'],['tacos','Tacos','pick shells'],['salad','Salad','lettuce base'],['nachos','Nachos','chip base'],['none','Sides only','no entrée']];
+const SHELLS=[['corn','White corn tortilla'],['t6','6" flour tortilla'],['hard','Hard shell']];
 
 let S=defaultState();
 function defaultState(){return {size:'full',fmt:'burrito',shell:'corn',shellN:3,chipOz:4,q:{pc:1,rw:1,bk:1,hf:1,cc:1,sf:2}};}
@@ -320,14 +321,15 @@ function decodeState(str){
   const st=defaultState();st.q={};
   const f=p.get('f');if(f&&FORMATS.some(x=>x[0]===f))st.fmt=f;
   if(p.get('s')==='k')st.size='kids';
-  const sh=p.get('sh');if(sh&&D[sh])st.shell=sh;
+  const sh=p.get('sh');if(sh&&SHELLS.some(x=>x[0]===sh))st.shell=sh;
   const sn=Math.round(+p.get('sn'));if(sn>=1&&sn<=6)st.shellN=sn;
   const co=Math.round(+p.get('co'));if([2,3,4,5,6,8].includes(co))st.chipOz=co;
   const q=p.get('q');
   if(q)q.split('.').forEach(pair=>{
     const i=pair.lastIndexOf('-');if(i<1)return;
     const id=pair.slice(0,i),v=Math.round(+pair.slice(i+1));
-    if(ALL[id]&&v>=1&&v<=6)st.q[id]=v;
+    // hasOwn, not ALL[id]: inherited keys like "constructor" would otherwise pass
+    if(Object.hasOwn(ALL,id)&&v>=1&&v<=6)st.q[id]=v;
   });
   return st;
 }
@@ -353,7 +355,7 @@ function renderFormats(){
     return `<button class="fmt" data-f="${f[0]}" aria-pressed="${S.fmt===f[0]}">${f[1]}<small>${sub}</small></button>`;}).join('');
   let o='';
   if(S.fmt==='tacos'){
-    o=`<label for="shell">Shell</label><select id="shell">${[['corn','White corn tortilla'],['t6','6" flour tortilla'],['hard','Hard shell']].map(s=>`<option value="${s[0]}" ${S.shell===s[0]?'selected':''}>${s[1]}</option>`).join('')}</select>
+    o=`<label for="shell">Shell</label><select id="shell">${SHELLS.map(s=>`<option value="${s[0]}" ${S.shell===s[0]?'selected':''}>${s[1]}</option>`).join('')}</select>
        <label for="shellN">Tacos</label><select id="shellN">${[1,2,3,4,5,6].map(n=>`<option ${S.shellN===n?'selected':''}>${n}</option>`).join('')}</select>
        <span class="note">Fillings below are for the whole order, so a standard scoop of protein is split across all the tacos.</span>`;
   } else if(S.fmt==='nachos'){
