@@ -172,6 +172,7 @@ footer a{color:inherit}
         <h3>Log it</h3>
         <div class="btns">
           <button class="btn primary" id="copyBtn">Copy summary</button>
+          <button class="btn" id="linkBtn">Copy share link</button>
           <button class="btn" id="resetBtn">Clear order</button>
         </div>
         <div id="toast" role="status"></div>
@@ -297,11 +298,46 @@ const ALL={};Object.values(D).forEach(r=>ALL[r.id]=r);
 SHARED.forEach(c=>c[2].forEach(r=>{ALL[r.id]=r;if(c[0]==='salsa')r.def=2;}));
 const ALG={G:'Gluten',D:'Dairy',E:'Egg',S:'Soy',F:'Fish',P:'Peanut'};
 const FORMATS=[['burrito','Burrito','13" tortilla'],['bowl','Bowl','no tortilla'],['tacos','Tacos','pick shells'],['salad','Salad','lettuce base'],['nachos','Nachos','chip base'],['none','Sides only','no entrée']];
+const SHELLS=[['corn','White corn tortilla'],['t6','6" flour tortilla'],['hard','Hard shell']];
 
 let S=defaultState();
 function defaultState(){return {size:'full',fmt:'burrito',shell:'corn',shellN:3,chipOz:4,q:{pc:1,rw:1,bk:1,hf:1,cc:1,sf:2}};}
 try{const s=JSON.parse(localStorage.getItem('pete.state')||'null');if(s&&s.q){S=Object.assign(defaultState(),s);for(const k in S.q)S.q[k]=Math.max(1,Math.round(S.q[k]));}}catch(e){}
-function persist(){try{localStorage.setItem('pete.state',JSON.stringify(S));}catch(e){}}
+// A shared link encodes the whole order in the hash and wins over whatever's in localStorage.
+function encodeState(){
+  const p=new URLSearchParams();
+  p.set('f',S.fmt);
+  if(S.size==='kids')p.set('s','k');
+  if(S.fmt==='tacos'){p.set('sh',S.shell);p.set('sn',S.shellN);}
+  if(S.fmt==='nachos')p.set('co',S.chipOz);
+  const q=Object.entries(S.q).filter(([,v])=>v>0).map(([k,v])=>k+'-'+v).join('.');
+  if(q)p.set('q',q);
+  return p.toString();
+}
+function decodeState(str){
+  if(!str)return null;
+  let p;try{p=new URLSearchParams(str);}catch(e){return null;}
+  if(!p.get('f')&&!p.get('q'))return null;
+  const st=defaultState();st.q={};
+  const f=p.get('f');if(f&&FORMATS.some(x=>x[0]===f))st.fmt=f;
+  if(p.get('s')==='k')st.size='kids';
+  const sh=p.get('sh');if(sh&&SHELLS.some(x=>x[0]===sh))st.shell=sh;
+  const sn=Math.round(+p.get('sn'));if(sn>=1&&sn<=6)st.shellN=sn;
+  const co=Math.round(+p.get('co'));if([2,3,4,5,6,8].includes(co))st.chipOz=co;
+  const q=p.get('q');
+  if(q)q.split('.').forEach(pair=>{
+    const i=pair.lastIndexOf('-');if(i<1)return;
+    const id=pair.slice(0,i),v=Math.round(+pair.slice(i+1));
+    // hasOwn, not ALL[id]: inherited keys like "constructor" would otherwise pass
+    if(Object.hasOwn(ALL,id)&&v>=1&&v<=6)st.q[id]=v;
+  });
+  return st;
+}
+const urlState=decodeState(location.hash.replace(/^#/,''));if(urlState)S=urlState;
+function persist(){
+  try{localStorage.setItem('pete.state',JSON.stringify(S));}catch(e){}
+  try{history.replaceState(null,'','#'+encodeState());}catch(e){}
+}
 
 const $=id=>document.getElementById(id);
 const fmtQ=(q,step)=>{if(step===1)return q+'×';const w=Math.floor(q),h=q-w>0;return (w?w:'')+(h?'½':'')+'×';};
@@ -319,7 +355,7 @@ function renderFormats(){
     return `<button class="fmt" data-f="${f[0]}" aria-pressed="${S.fmt===f[0]}">${f[1]}<small>${sub}</small></button>`;}).join('');
   let o='';
   if(S.fmt==='tacos'){
-    o=`<label for="shell">Shell</label><select id="shell">${[['corn','White corn tortilla'],['t6','6" flour tortilla'],['hard','Hard shell']].map(s=>`<option value="${s[0]}" ${S.shell===s[0]?'selected':''}>${s[1]}</option>`).join('')}</select>
+    o=`<label for="shell">Shell</label><select id="shell">${SHELLS.map(s=>`<option value="${s[0]}" ${S.shell===s[0]?'selected':''}>${s[1]}</option>`).join('')}</select>
        <label for="shellN">Tacos</label><select id="shellN">${[1,2,3,4,5,6].map(n=>`<option ${S.shellN===n?'selected':''}>${n}</option>`).join('')}</select>
        <span class="note">Fillings below are for the whole order, so a standard scoop of protein is split across all the tacos.</span>`;
   } else if(S.fmt==='nachos'){
@@ -446,6 +482,9 @@ $('sizeFull').setAttribute('aria-pressed',S.size==='full');$('sizeKids').setAttr
 $('resetBtn').onclick=()=>{S.q={};all();toast('Order cleared');};
 $('copyBtn').onclick=()=>{const txt=summaryText();
   navigator.clipboard.writeText(txt).then(()=>toast('Copied to clipboard'),()=>{toast('Copy blocked here. Text is in the name box; select and copy it.');$('presetName').value=txt.split('\n')[1];$('presetName').select();});};
+$('linkBtn').onclick=()=>{const url=location.href.split('#')[0]+'#'+encodeState();
+  navigator.clipboard.writeText(url).then(()=>toast('Share link copied'),()=>{toast('Copy blocked here. Link is in the name box; select and copy it.');$('presetName').value=url;$('presetName').select();});};
+window.addEventListener('hashchange',()=>{const st=decodeState(location.hash.replace(/^#/,''));if(st){S=st;all();}});
 $('saveBtn').onclick=()=>{const n=$('presetName').value.trim();if(!n){toast('Give the order a name first');return;}
   const P=renderPresets();P[n]=JSON.parse(JSON.stringify(S));try{localStorage.setItem('pete.presets',JSON.stringify(P));toast('Saved '+n);}catch(e){toast('This browser blocked saving');}
   $('presetName').value='';renderPresets();};
